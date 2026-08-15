@@ -1,4 +1,5 @@
 node_modules/
 verify-out/
 *.log
+*.bak
 .DS_Store
