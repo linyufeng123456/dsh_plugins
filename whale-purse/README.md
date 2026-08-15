@@ -1,16 +1,16 @@
-# whale-purse 🐋（DeepSeek 酱桌宠 · 二改版）
+# whale-purse 🐋
 
-> ⚠️ 本仓库是 [Suiwan/whale-purse](https://github.com/Suiwan/whale-purse) 的**改造版**：保留原版「DeepSeek 余额 + 会话用量/花费监视」全部能力，把桌宠形象升级为 petdex 的 deepseek 酱精灵表动画，并新增后台任务进度卡。原版作者 [Zijian Li](https://github.com/Suiwan)，MIT License，详见文末「上游与版权」。
+> ⚠️ 本仓库是 [Suiwan/whale-purse](https://github.com/Suiwan/whale-purse) 的**改造版**：保留原版「DeepSeek 余额 + 会话用量/花费监视」全部能力，把桌宠形象升级为 petdex 的 deepseek 精灵表动画，并新增后台任务进度卡。原版作者 [Zijian Li](https://github.com/Suiwan)，MIT License，详见文末「上游与致谢」。
 
 一只住在 DeepSeek Harness（DSH）里的桌宠，帮你盯着 DeepSeek 账户余额和当前会话的用量/花费。点她弹出用量明细面板，拖她换位置（按方向播奔跑动画），位置自动记住；余额 30s、花费 3s 自动刷新，后台会话运行时头顶还会悬浮实时进度卡。
 
-桌宠形象与动作采用 [petdex.dev/pets/deepseek](https://petdex.dev/pets/deepseek) 的 deepseek 酱（Codex 宠物格式：8×9 精灵表 + 9 态动画 + 活动触发），帧时序移植自 petdex 官方桌面端。
+桌宠形象与动作采用 [petdex.dev/pets/deepseek](https://petdex.dev/pets/deepseek) 的 deepseek 宠物形象（Codex 宠物格式：8×9 精灵表 + 9 态动画 + 活动触发），帧时序移植自 petdex 官方桌面端。
 
-![deepseek 酱精灵表](assets/deepseek-sprite.webp)
+![petdex deepseek 精灵表](assets/deepseek-sprite.webp)
 
 ## 特性
 
-- 🐋 **deepseek 酱桌宠**：petdex Codex 精灵表悬浮在页面上，逐帧动画、脚底带投影
+- 🐋 **鲸鱼娘桌宠**：petdex Codex 精灵表悬浮在页面上，逐帧动画、脚底带投影
 - 🎬 **petdex 动作模组**：9 态精灵动画（idle / running-left / running-right / waving / jumping / failed / waiting / running / review），帧时长与官方桌面端一致
 - 🏃 **拖拽奔跑**：按住拖动时按水平方向播放 running-left / running-right 奔跑帧动画；位置 `localStorage` 记忆，点击开面板
 - ⚡ **活动触发（移植 petdex 状态机）**：会话开始 / 收到新任务 → jumping 蹦跳；执行工具 → running；read/grep/glob 类工具 → review 翻阅；等待用户输入（询问）→ waiting；工具失败 → failed；任务完成 → waving 挥手 + 「任务完成啦」气泡（点击直达会话）
@@ -27,7 +27,7 @@
 
 | 方面 | 原版 [Suiwan/whale-purse](https://github.com/Suiwan/whale-purse) | 本改造版 |
 | --- | --- | --- |
-| 桌宠形象 | dafeiyu 鲸鱼娘静态立绘（纯 CSS 摆动/抖动） | petdex deepseek 酱 8×9 精灵表，逐帧动画 |
+| 桌宠形象 | dafeiyu 鲸鱼娘静态立绘（纯 CSS 摆动/抖动） | petdex deepseek 8×9 精灵表，逐帧动画 |
 | 动画系统 | 无状态动画 | JS 精灵播放器，9 态状态机（帧时序移植自 petdex-desktop-native `sprite.zig`） |
 | 拖拽 | 拖动换位 | 拖动按方向播奔跑动画（>4px 判定） |
 | 活动触发 | 任务完成弹跳 + 气泡 | 完整 petdex 状态机（蹦跳/奔跑/翻阅/等待/失败/挥手） |
@@ -79,9 +79,9 @@
 whale-purse/
 ├── lib/
 │   ├── index.js        # host 端：余额服务 + HTTP 路由（/api/balance 等），与上游一致
-│   └── client.js       # 浏览器端：deepseek 酱桌宠 + petdex 状态机 + 进程进度卡 + 账单面板（精灵表 base64 内联）
+│   └── client.js       # 浏览器端：鲸鱼娘桌宠 + petdex 状态机 + 进程进度卡 + 账单面板（精灵表 base64 内联）
 ├── assets/
-│   ├── deepseek-sprite.webp    # deepseek 酱精灵表（8×9 网格，144×156 帧，已压至 393KB）
+│   ├── deepseek-sprite.webp    # petdex deepseek 精灵表（8×9 网格，144×156 帧，已压至 393KB）
 │   ├── whale-sprite.png        # 旧版鲸鱼娘正面立绘（已弃用，历史素材）
 │   ├── whale-front-source.png  # 旧版立绘源图（已弃用）
 │   └── preview.png             # 旧版立绘预览（历史素材）
@@ -90,7 +90,7 @@ whale-purse/
 
 ## 素材来源与版权
 
-- 桌宠形象与动画：deepseek 酱，来自 [petdex.dev/pets/deepseek](https://petdex.dev/pets/deepseek)（投稿者 fightingshine，基于 DeepSeek 娘化三视图的蓝发鲸尾 Q 版女仆动态宠物）。动画状态/帧时序移植自 [petdex-desktop-native](https://github.com/crafter-station/petdex) 的 `sprite.zig`。
+- 桌宠形象与动画：deepseek 宠物形象，来自 [petdex.dev/pets/deepseek](https://petdex.dev/pets/deepseek)（投稿者 fightingshine，基于 DeepSeek 娘化三视图的蓝发鲸尾 Q 版女仆动态宠物）。动画状态/帧时序移植自 [petdex-desktop-native](https://github.com/crafter-station/petdex) 的 `sprite.zig`。
 - 旧版鲸鱼娘立绘来自 [dafeiyu-pet](https://github.com/1190fasheqi/dafeiyu-pet)（MIT License），现已弃用，保留作历史素材。
 - 本项目为 DeepSeek / DSH 的非官方插件，与 DeepSeek 官方无关联。
 
