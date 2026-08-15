@@ -1,7 +1,5 @@
 # whale-purse 🐋
 
-> ⚠️ 本仓库是 [Suiwan/whale-purse](https://github.com/Suiwan/whale-purse) 的**改造版**：保留原版「DeepSeek 余额 + 会话用量/花费监视」全部能力，把桌宠形象升级为 8×9 精灵表逐帧动画，并新增后台任务进度卡。原版作者 [Zijian Li](https://github.com/Suiwan)，MIT License，详见文末「上游与致谢」。
-
 一只住在 DeepSeek Harness（DSH）里的桌宠，帮你盯着 DeepSeek 账户余额和当前会话的用量/花费。点她弹出用量明细面板，拖她换位置（按方向播奔跑动画），位置自动记住；余额 30s、花费 3s 自动刷新，后台会话运行时头顶还会悬浮实时进度卡。
 
 桌宠形象为 8×9 精灵表（9 态动画 + 活动触发）的 deepseek 宠物二创形象，由 JS 播放器逐帧驱动。
@@ -22,18 +20,6 @@
 - 🖥️ **多屏适配**：外接大屏/笔记本切换时自动把桌宠夹回视口内，不会丢
 - 🛡️ **友好错误**：余额/定价请求超时显示「请求超时」而非英文 `This operation was aborted`
 - 🧩 **兼容 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)**：适配其 Explorer 面板的浮层层级，桌宠拖进面板区域也不会被遮挡
-
-## 与原版的差异（改造内容）
-
-| 方面 | 原版 [Suiwan/whale-purse](https://github.com/Suiwan/whale-purse) | 本改造版 |
-| --- | --- | --- |
-| 桌宠形象 | dafeiyu 鲸鱼娘静态立绘（纯 CSS 摆动/抖动） | deepseek 8×9 精灵表，逐帧动画 |
-| 动画系统 | 无状态动画 | JS 精灵播放器，9 态状态机 |
-| 拖拽 | 拖动换位 | 拖动按方向播奔跑动画（>4px 判定） |
-| 活动触发 | 任务完成弹跳 + 气泡 | 完整活动状态机（蹦跳/奔跑/翻阅/等待/失败/挥手） |
-| 后台任务进度卡 | 无 | 新增：任务标题、当前动作、todo 进度、轮次徽章、时长/token/步数（`session.history` RPC，2s 刷新） |
-| host 端（`lib/index.js`） | — | 无改动，与上游一致 |
-| 余额/用量监视、峰谷定价、主题/多屏适配 | 有 | 全部保留，行为一致 |
 
 ## 安装
 
@@ -78,26 +64,18 @@
 ```
 whale-purse/
 ├── lib/
-│   ├── index.js        # host 端：余额服务 + HTTP 路由（/api/balance 等），与上游一致
+│   ├── index.js        # host 端：余额服务 + HTTP 路由（/api/balance 等）
 │   └── client.js       # 浏览器端：鲸鱼娘桌宠 + 精灵状态机 + 进程进度卡 + 账单面板（精灵表 base64 内联）
 ├── assets/
 │   ├── deepseek-sprite.webp    # deepseek 精灵表（8×9 网格，144×156 帧，已压至 393KB）
-│   ├── whale-sprite.png        # 旧版鲸鱼娘正面立绘（已弃用，历史素材）
+│   ├── whale-sprite.png        # 旧版鲸鱼娘正面立绘（已弃用）
 │   ├── whale-front-source.png  # 旧版立绘源图（已弃用）
-│   └── preview.png             # 旧版立绘预览（历史素材）
+│   └── preview.png             # 旧版立绘预览
 └── scripts/screenshot.mjs      # Playwright 截图脚本
 ```
 
-## 素材来源与版权
-
-- 旧版鲸鱼娘立绘来自 [dafeiyu-pet](https://github.com/1190fasheqi/dafeiyu-pet)（MIT License），现已弃用，保留作历史素材。
-- 本项目为 DeepSeek / DSH 的非官方插件，与 DeepSeek 官方无关联。
-
-## 上游与致谢
-
-- 本改造版基于 [Suiwan/whale-purse](https://github.com/Suiwan/whale-purse)（作者 Zijian Li，MIT License），余额/用量监视、峰谷定价、主题适配等核心能力来自上游。
-- 改造内容（精灵动画桌宠 + 状态机 + 进度卡）由 [linyufeng123456](https://github.com/linyufeng123456) 完成。
+> 本项目为 DeepSeek / DSH 的非官方插件，与 DeepSeek 官方无关联。
 
 ## License
 
-[MIT](LICENSE) · 原版版权 Zijian Li，改造部分版权 Lin Yufeng
+[MIT](LICENSE)
