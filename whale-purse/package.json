@@ -1,6 +1,6 @@
 {
   "name": "whale-purse",
-  "description": "鲸鱼娘桌宠 · DeepSeek 余额 + 会话用量/花费监视 + petdex deepseek 精灵动画 + 后台任务进度卡，直接挂进 DSH Web profile 的组合层（cordis.patch.yml insert，热重载）",
+  "description": "鲸鱼娘桌宠 · DeepSeek 余额 + 会话用量/花费监视 + 精灵表动画 + 后台任务进度卡，直接挂进 DSH Web profile 的组合层（cordis.patch.yml insert，热重载）",
   "version": "1.1.0",
   "author": "Zijian Li (原版) · Lin Yufeng (改造)",
   "type": "module",
@@ -35,7 +35,6 @@
     "usage",
     "desktop-pet",
     "cordis",
-    "petdex",
     "sprite"
   ],
   "repository": {
