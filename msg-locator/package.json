@@ -1,0 +1,35 @@
+{
+  "name": "msg-locator",
+  "description": "DSH Web 插件：在当前会话中定位历史发送的消息（消息目录 + 点击跳转高亮 + 关键字过滤 + 加载更早消息），复用官方会话快照与聊天流锚点，零后端改动",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    }
+  },
+  "keywords": [
+    "deepseek",
+    "dsh",
+    "chat",
+    "message-locator",
+    "conversation",
+    "cordis"
+  ],
+  "license": "MIT"
+}
