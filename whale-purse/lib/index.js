@@ -214,6 +214,8 @@ class BalanceService {
     this.cached = undefined
     this.cachedAt = 0
     this.inflight = undefined
+    /** 订阅网关适配表：内置 + config.subscriptions 扩展（后者覆盖同名内置项）。 */
+    this.subscriptionAdapters = { ...BUILTIN_SUBSCRIPTION_ADAPTERS, ...buildConfigAdapters(config) }
     /** 价格快照：先落内置预设，后台再刷新官方页。 */
     this.pricingSnapshot = { fetchedAt: Date.now(), current: CURRENT_PRESETS, peak: PEAK_PRESETS }
     this.pricingTimer = undefined
@@ -379,20 +381,229 @@ class BalanceService {
     }
   }
 
-  /** 凭据缝 → 启动环境 → process.env，逐层解析 API key。 */
-  async resolveApiKey() {
+  /** 凭据缝 → 启动环境 → process.env，逐层解析 API key（默认余额用 env，可指定其它）。 */
+  async resolveApiKey(envName = this.apiKeyEnv) {
     const credentials = this.ctx.get('credentials')
     if (credentials !== undefined && typeof credentials.resolve === 'function') {
-      const hit = await credentials.resolve(this.apiKeyEnv)
+      const hit = await credentials.resolve(envName)
       if (hit !== undefined && typeof hit.value === 'string' && hit.value.length > 0) return hit.value
     }
     const launchEnvironment = this.ctx.get('launchEnvironment')
-    const ambient = launchEnvironment?.get?.(String(this.apiKeyEnv))
+    const ambient = launchEnvironment?.get?.(String(envName))
     if (ambient !== undefined && typeof ambient.value === 'string' && ambient.value.length > 0) return ambient.value
-    const env = process.env[this.apiKeyEnv]
+    const env = process.env[envName]
     if (typeof env === 'string' && env.length > 0) return env
     return undefined
   }
+
+  /**
+   * 订阅用量：按 provider 查对应网关的用量接口（密钥留在 host 侧）。
+   * 解析结果统一折叠为 { kind: 'percent'|'credits'|'balance', view: {...} }。
+   * @param provider - 会话路由的 provider id。
+   * @returns { ok, provider, fetchedAt?, kind?, view?, error? }
+   */
+  async subscriptionUsage(provider) {
+    const adapter = this.subscriptionAdapters[provider]
+    if (adapter === undefined) {
+      return { ok: false, provider, error: `unsupported provider "${provider}"` }
+    }
+    const fetchedAt = Date.now()
+    const key = await this.resolveApiKey(adapter.credentialEnv)
+    if (key === undefined) {
+      return { ok: false, provider, error: `no API key (store ${adapter.credentialEnv} via the credentials seam)` }
+    }
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 10_000)
+      let response
+      try {
+        response = await fetch(adapter.usageUrl, {
+          method: 'GET',
+          headers: { authorization: `Bearer ${key}`, accept: 'application/json' },
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+      if (!response.ok) {
+        const body = await response.text().catch(() => '')
+        return {
+          ok: false,
+          provider,
+          error: `usage endpoint HTTP ${response.status}${body ? ` — ${truncate(body, 160)}` : ''}`,
+        }
+      }
+      const payload = await response.json()
+      const parsed = adapter.parse(payload)
+      if (parsed === undefined) {
+        return { ok: false, provider, error: 'usage payload not recognized' }
+      }
+      return { ok: true, provider, fetchedAt, kind: parsed.kind, view: parsed.view }
+    } catch (error) {
+      return { ok: false, provider, error: friendlyError(error, '订阅用量查询') }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 订阅用量适配框架：内置网关 + 配置可扩展（cordis.patch.yml config.subscriptions）
+// ---------------------------------------------------------------------------
+
+/**
+ * 各网关用量响应 → 统一视图的解析器注册表。
+ * 每种解析器返回 `{ kind, view }` 或 undefined（形状不匹配）。
+ * - kind 'percent'  → view { rolling, weekly, monthly }（各 { percent, resetsAt, status }）
+ * - kind 'credits'  → view { usage, limit, currency }（已用 / 限额，limit 可为 null）
+ * - kind 'balance'  → view { total, currency, available, balances: [{currency,total,granted,toppedUp}] }
+ */
+const USAGE_PARSERS = {
+  /** OpenCode Zen Go 风格：{ usage: { rolling|weekly|monthly: { percent, resetsAt, status } } } */
+  'percent-buckets'(payload) {
+    const usage = payload?.usage
+    if (usage === null || typeof usage !== 'object') return undefined
+    const fold = (key) => {
+      const bucket = usage[key]
+      if (bucket === null || typeof bucket !== 'object') return undefined
+      const percent = Number(bucket.percent)
+      if (!Number.isFinite(percent)) return undefined
+      return {
+        percent,
+        resetsAt: typeof bucket.resetsAt === 'string' ? bucket.resetsAt : null,
+        status: typeof bucket.status === 'string' ? bucket.status : null,
+      }
+    }
+    const rolling = fold('rolling')
+    const weekly = fold('weekly')
+    const monthly = fold('monthly')
+    if (rolling === undefined || weekly === undefined || monthly === undefined) return undefined
+    return { kind: 'percent', view: { rolling, weekly, monthly } }
+  },
+
+  /** OpenRouter 风格：{ data: { usage, limit } }（美元额度）。 */
+  'openrouter-key'(payload) {
+    const data = payload?.data
+    if (data === null || typeof data !== 'object') return undefined
+    const usage = Number(data.usage)
+    if (!Number.isFinite(usage)) return undefined
+    const limit = Number(data.limit)
+    return {
+      kind: 'credits',
+      view: {
+        usage,
+        limit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        currency: 'USD',
+      },
+    }
+  },
+
+  /** DeepSeek 风格：{ balance_infos: [{ currency, total_balance, granted_balance, topped_up_balance }], is_available } */
+  'deepseek-balance'(payload) {
+    const buckets = Array.isArray(payload?.balance_infos)
+      ? payload.balance_infos.map((b) => ({
+        currency: String(b.currency ?? ''),
+        total: Number(b.total_balance),
+        granted: Number(b.granted_balance),
+        toppedUp: Number(b.topped_up_balance),
+      })).filter((b) => b.currency !== '')
+      : []
+    if (buckets.length === 0) return undefined
+    return {
+      kind: 'balance',
+      view: {
+        total: buckets[0].total,
+        currency: buckets[0].currency,
+        available: payload.is_available !== false,
+        balances: buckets,
+      },
+    }
+  },
+
+  /** 通用余额：在 payload / payload.data 里找 total_balance / balance / credits 数值。 */
+  'balance-generic'(payload) {
+    const root = payload?.data !== null && typeof payload?.data === 'object' ? payload.data : payload
+    if (root === null || typeof root !== 'object') return undefined
+    const currency = typeof root.currency === 'string' && root.currency !== '' ? root.currency : 'USD'
+    for (const key of ['total_balance', 'balance', 'credits', 'totalCredits', 'total_credits', 'available_balance', 'balance_available']) {
+      const value = Number(root[key])
+      if (Number.isFinite(value)) {
+        return { kind: 'balance', view: { total: value, currency, available: true, balances: [{ currency, total: value, granted: 0, toppedUp: 0 }] } }
+      }
+    }
+    // 数值型用量：{ data: { total_usage, ... } } → credits（无限额）
+    const usage = Number(root.total_usage ?? root.usage)
+    if (Number.isFinite(usage)) {
+      return { kind: 'credits', view: { usage, limit: null, currency } }
+    }
+    return undefined
+  },
+
+  /** OpenAI 组织用量：{ total_usage }（单位美分）。 */
+  'openai-usage'(payload) {
+    const cents = Number(payload?.total_usage)
+    if (!Number.isFinite(cents)) return undefined
+    return { kind: 'credits', view: { usage: cents / 100, limit: null, currency: 'USD' } }
+  },
+
+  /** 依次尝试常见形状，首个命中的胜出。 */
+  auto(payload) {
+    for (const name of ['percent-buckets', 'openrouter-key', 'deepseek-balance', 'balance-generic']) {
+      const parsed = USAGE_PARSERS[name](payload)
+      if (parsed !== undefined) return parsed
+    }
+    return undefined
+  },
+}
+
+/**
+ * 内置订阅网关适配表（provider → { name, credentialEnv, usageUrl, parse }）。
+ * 新增第三方 API 无需改代码：在 cordis.patch.yml 的 config.subscriptions 里声明即可。
+ */
+const BUILTIN_SUBSCRIPTION_ADAPTERS = {
+  'opencode-go': {
+    name: 'OpenCode Zen Go',
+    credentialEnv: 'OPENCODE_GO_API_KEY',
+    usageUrl: 'https://opencode.ai/zen/go/v1/usage',
+    parse: USAGE_PARSERS['percent-buckets'],
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    credentialEnv: 'OPENROUTER_API_KEY',
+    usageUrl: 'https://openrouter.ai/api/v1/auth/key',
+    parse: USAGE_PARSERS['openrouter-key'],
+  },
+  openai: {
+    name: 'ChatGPT (OpenAI)',
+    credentialEnv: 'OPENAI_API_KEY',
+    usageUrl: 'https://api.openai.com/v1/organization/usage',
+    parse: USAGE_PARSERS['openai-usage'],
+  },
+  xai: {
+    name: 'xAI (Grok)',
+    credentialEnv: 'XAI_API_KEY',
+    usageUrl: 'https://api.x.ai/v1/usage',
+    parse: USAGE_PARSERS.auto,
+  },
+}
+
+/** 从 config.subscriptions 构建自定义适配表；parser 名非法时报错（fail-loud）。 */
+function buildConfigAdapters(config = {}) {
+  const entries = config.subscriptions ?? {}
+  const adapters = {}
+  for (const [provider, entry] of Object.entries(entries)) {
+    if (entry === null || typeof entry !== 'object') continue
+    const credentialEnv = typeof entry.credentialEnv === 'string' && entry.credentialEnv !== '' ? entry.credentialEnv : undefined
+    const usageUrl = typeof entry.usageUrl === 'string' && entry.usageUrl !== '' ? entry.usageUrl : undefined
+    if (credentialEnv === undefined || usageUrl === undefined) {
+      throw new Error(`whale-purse: subscription "${provider}" needs credentialEnv and usageUrl`)
+    }
+    const parserName = entry.parser ?? 'auto'
+    const parse = USAGE_PARSERS[parserName]
+    if (parse === undefined) {
+      throw new Error(`whale-purse: subscription "${provider}" has unknown parser "${parserName}" (可用: ${Object.keys(USAGE_PARSERS).join(', ')})`)
+    }
+    adapters[provider] = { name: entry.name ?? provider, credentialEnv, usageUrl, parse }
+  }
+  return adapters
 }
 
 // ---------------------------------------------------------------------------
@@ -446,6 +657,15 @@ function sessionParam(req) {
   return value === null || value === '' ? undefined : value
 }
 
+/** 读请求 URL 里的 `provider` 查询参数。 */
+function queryParam(req, name) {
+  const raw = req.url ?? ''
+  const q = raw.indexOf('?')
+  if (q < 0) return undefined
+  const value = new URLSearchParams(raw.slice(q + 1)).get(name)
+  return value === null || value === '' ? undefined : value
+}
+
 // ---------------------------------------------------------------------------
 // 插件入口
 // ---------------------------------------------------------------------------
@@ -477,6 +697,15 @@ export function apply(ctx, config = {}) {
       if (resolved === undefined) return { ok: false, error: 'unknown-session' }
       return { ok: true, ...resolved.cost }
     }),
+    getRequestRoute('/api/whale-purse/subscription', (req) => {
+      const provider = queryParam(req, 'provider')
+      if (provider === undefined) return { ok: false, error: 'missing-provider' }
+      return service.subscriptionUsage(provider)
+    }),
+    getRoute('/api/whale-purse/providers', () => ({
+      ok: true,
+      providers: Object.entries(service.subscriptionAdapters).map(([id, adapter]) => ({ id, name: adapter.name })),
+    })),
   ]
 
   const registerRoutes = () => {
