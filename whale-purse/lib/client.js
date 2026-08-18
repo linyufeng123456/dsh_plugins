@@ -348,6 +348,11 @@ window.__ModuleLoader__.load({
         font-size: 10px; letter-spacing: .04em;
         border: 1px solid rgba(210,153,34,.45); color: var(--dsw-static-amber-500, #d29922);
       }
+      .um-band--peak {
+        background: var(--dsw-static-amber-500, #d29922);
+        border-color: transparent;
+        color: #1b1b1c; font-weight: 600;
+      }
       .um-band-off { border-color: rgba(45,164,78,.4); color: var(--dsw-alias-state-success-primary, #2da44e); }
       .um-updated { margin-top: 5px; font-size: 11px; opacity: .5; display: flex; align-items: center; justify-content: space-between; }
       .um-updated a { color: inherit; text-decoration: underline; text-underline-offset: 2px; opacity: .9; }
@@ -1317,9 +1322,17 @@ window.__ModuleLoader__.load({
                 h('b', null, cost.pricing.model === 'pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash'),
                 ` · 输入 ¥${fmtMoney(cost.pricing.inputPerMillion)}/1M · 命中 ¥${fmtMoney(cost.pricing.cacheReadPerMillion)}/1M · 输出 ¥${fmtMoney(cost.pricing.outputPerMillion)}/1M`,
               ),
-            !isSubscription && costOk && cost.pricing !== undefined && cost.pricing.peakPricingActive && cost.pricing.band !== 'standard'
-              && h('div', { className: `um-band ${cost.pricing.band === 'off-peak' ? 'um-band-off' : ''}` },
-                cost.pricing.band === 'peak' ? t('usage.peak') : t('usage.offPeak'),
+            !isSubscription && costOk && cost.pricing !== undefined
+              && h('div', {
+                className: `um-band${
+                  cost.pricing.band === 'peak' ? ' um-band--peak'
+                    : cost.pricing.band === 'off-peak' ? ' um-band-off'
+                      : ''
+                }`,
+              },
+                cost.pricing.band === 'peak' ? t('usage.peak')
+                  : cost.pricing.band === 'off-peak' ? t('usage.offPeak')
+                    : t('usage.standardPricing'),
               ),
             (isSubscription ? subUsage?.ok === true : balanceView !== null && balanceView.fetchedAt > 0)
               && h('div', { className: 'um-updated' },
